@@ -1,15 +1,28 @@
 // ============================================================================
-//  06_createProposals.ts — Crea 4 proposte di investimento
+//  06_createProposals.ts — Crea 4 proposte di investimento in startup
 // ============================================================================
 //
-//  SUPPLY DOPO UPGRADE: 2.416.000 COMP
-//  QUORUM (4%):         96.640 COMP
-//  SUPERQUORUM (20%):   483.200 COMP
+//  COSA FA QUESTO SCRIPT:
+//  ──────────────────────
+//  Crea 4 proposte di governance per investire ETH dal Treasury in una startup.
+//  Ogni proposta chiede di trasferire una quantità diversa di ETH.
 //
-//  A — "Lab AI" (10 ETH)         → vincerà con SUPERQUORUM
-//  B — "Ricerca" (3 ETH)         → vincerà con ~57% a fine votazione
-//  C — "Espansione" (8 ETH)      → perderà nonostante il quorum
-//  D — "Fondo Minore" (1 ETH)    → non raggiungerà il quorum
+//  LE 4 PROPOSTE:
+//  ──────────────
+//  A — "Lab AI"          (10 ETH) → vincerà con SUPERQUORUM (voto immediato)
+//  B — "Ricerca"         (3 ETH)  → vincerà con ~57% a fine votazione
+//  C — "Espansione"      (8 ETH)  → perderà nonostante il quorum raggiunto
+//  D — "Fondo Minore"    (1 ETH)  → non raggiungerà nemmeno il quorum
+//
+//  COME FUNZIONA UNA PROPOSTA:
+//  ──────────────────────────
+//  Il Governor riceve:
+//  - targets:   l'indirizzo del contratto da chiamare (Treasury)
+//  - values:    ETH da inviare con la chiamata (0, perché invest() non è payable)
+//  - calldatas: la chiamata codificata (invest(startup, importo))
+//  - description: testo leggibile della proposta
+//
+//  Gli ID delle proposte vengono salvati in proposalState.json per gli script successivi.
 //
 //  ESECUZIONE: npx hardhat run scripts/06_createProposals.ts --network localhost
 // ============================================================================
@@ -23,11 +36,13 @@ async function main() {
     console.log("  CompetenceDAO — Creazione di 4 proposte");
     console.log("══════════════════════════════════════════════════\n");
 
+    // Carica gli indirizzi dei contratti
     const addressesPath = path.join(__dirname, "..", "deployedAddresses.json");
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf8"));
     const treasury = await ethers.getContractAt("Treasury", addresses.treasury);
     const governor = await ethers.getContractAt("MyGovernor", addresses.governor);
 
+    // Definizione delle 4 proposte di investimento
     const proposals = [
         { amount: "10", desc: "Proposta A: Investire 10 ETH in Laboratorio AI" },
         { amount: "3", desc: "Proposta B: Investire 3 ETH in Ricerca Congiunta" },
@@ -35,20 +50,31 @@ async function main() {
         { amount: "1", desc: "Proposta D: Investire 1 ETH in Fondo Sperimentale" },
     ];
 
+    // Per ogni proposta:
+    //   1. Codifica la chiamata invest(startup, importo) come calldata
+    //   2. Invia la proposta al Governor con propose()
+    //   3. Estrae il proposalId dall'evento ProposalCreated
     const proposalIds: string[] = [];
     for (const p of proposals) {
+        // Codifica la chiamata: treasury.invest(mockStartup, importoInWei)
         const calldata = treasury.interface.encodeFunctionData("invest", [
             addresses.mockStartup, ethers.parseEther(p.amount),
         ]);
+
+        // Crea la proposta nel Governor
         const tx = await governor.propose([addresses.treasury], [0n], [calldata], p.desc);
         const receipt = await tx.wait();
+
+        // Estrai il proposalId dall'evento ProposalCreated nei log
         const id = receipt!.logs
             .map((log: any) => { try { return governor.interface.parseLog(log); } catch { return null; } })
             .find((pr: any) => pr?.name === "ProposalCreated")?.args?.proposalId;
+
         proposalIds.push(id.toString());
         console.log(`   📝 ${p.desc} (ID: ${id})`);
     }
 
+    // Salva le proposte in un file JSON per gli script successivi (voto, queue, execute)
     const state = { proposals: proposals.map((p, i) => ({ ...p, id: proposalIds[i] })) };
     fs.writeFileSync(path.join(__dirname, "..", "proposalState.json"), JSON.stringify(state, null, 2));
 

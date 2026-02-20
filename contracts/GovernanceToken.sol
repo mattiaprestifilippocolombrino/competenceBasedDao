@@ -10,8 +10,14 @@ pragma solidity ^0.8.28;
 //  1. Chiunque può unirsi alla DAO chiamando joinDAO() e inviando ETH.
 //     Riceve token in proporzione: 1 ETH = 1.000 COMP (massimo 100 ETH).
 //     Diventa automaticamente Student (coefficiente = 1).
+//     Gli ETH vengono automaticamente trasferiti al Treasury della DAO.
 //
-//  2. Per aumentare il proprio peso di voto, un membro può richiedere un
+//  2. I membri possono acquistare token aggiuntivi chiamando mintTokens().
+//     I token mintati tengono conto del grado di competenza:
+//     TokenMintati = ETH × 1.000 × CoefficienteCompetenza
+//     Es: un PhD che invia 1 ETH riceve 1.000 × 4 = 4.000 COMP.
+//
+//  3. Per aumentare il proprio peso di voto, un membro può richiedere un
 //     UPGRADE DI COMPETENZA tramite proposta di governance. I membri votano
 //     e, se approvata, il Timelock chiama upgradeCompetence().
 //
@@ -76,6 +82,12 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes {
     /// @notice Indirizzo del TimelockController — autorizza gli upgrade di competenza
     address public timelock;
 
+    /// @notice Indirizzo del Treasury — riceve gli ETH dai joinDAO()
+    address public treasury;
+
+    /// @notice Indirizzo del deployer — può chiamare setTreasury() una sola volta
+    address public immutable deployer;
+
     /// @notice Coefficiente associato a ogni grado di competenza
     mapping(CompetenceGrade => uint256) public competenceScore;
 
@@ -104,6 +116,14 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes {
         uint256 tokensReceived
     );
 
+    /// @notice Emesso quando un membro minta token aggiuntivi
+    event TokensMinted(
+        address indexed member,
+        uint256 ethDeposited,
+        uint256 tokensMinted,
+        uint256 competenceScore
+    );
+
     /// @notice Emesso quando un membro viene promosso a un grado superiore
     event CompetenceUpgraded(
         address indexed member,
@@ -117,12 +137,16 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes {
     // ======================================================================
 
     error OnlyTimelock(); // Solo il Timelock può chiamare questa funzione
+    error OnlyDeployer(); // Solo il deployer può chiamare questa funzione
     error AlreadyMember(); // L'indirizzo è già un membro della DAO
     error NotMember(); // L'indirizzo non è un membro della DAO
     error ZeroDeposit(); // Devi inviare almeno un po' di ETH
     error ExceedsMaxDeposit(); // Superato il deposito massimo di 100 ETH
     error CannotDowngrade(); // Non puoi scendere di grado
     error ZeroAddress(); // Indirizzo non valido
+    error TreasuryNotSet(); // Il Treasury non è stato ancora impostato
+    error TreasuryAlreadySet(); // Il Treasury è già stato impostato
+    error TreasuryTransferFailed(); // Trasferimento ETH al Treasury fallito
 
     // ======================================================================
     //  Modifier
@@ -131,6 +155,12 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes {
     /// @notice Solo il TimelockController può chiamare questa funzione
     modifier onlyTimelock() {
         if (msg.sender != timelock) revert OnlyTimelock();
+        _;
+    }
+
+    /// @notice Solo il deployer può chiamare questa funzione
+    modifier onlyDeployer() {
+        if (msg.sender != deployer) revert OnlyDeployer();
         _;
     }
 
@@ -145,6 +175,7 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes {
     ) ERC20("CompetenceDAO Token", "COMP") ERC20Permit("CompetenceDAO Token") {
         if (_timelock == address(0)) revert ZeroAddress();
         timelock = _timelock;
+        deployer = msg.sender;
 
         // ── Tabella coefficienti ──
         competenceScore[CompetenceGrade.Student] = 1;
@@ -155,14 +186,29 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes {
     }
 
     // ======================================================================
+    //  Funzione di setup — Impostazione Treasury (one-shot)
+    // ======================================================================
+
+    /// @notice Imposta l'indirizzo del Treasury. Può essere chiamata una sola volta dal deployer.
+    /// @param _treasury Indirizzo del contratto Treasury
+    /// @dev Necessaria perché il Treasury viene deployato dopo il GovernanceToken.
+    ///      Una volta impostato, non può essere modificato (pattern one-shot).
+    function setTreasury(address _treasury) external onlyDeployer {
+        if (treasury != address(0)) revert TreasuryAlreadySet();
+        if (_treasury == address(0)) revert ZeroAddress();
+        treasury = _treasury;
+    }
+
+    // ======================================================================
     //  Funzione pubblica — Ingresso nella DAO
     // ======================================================================
 
     /// @notice Entra nella DAO inviando ETH. Ricevi COMP in proporzione (1 ETH = 1.000 COMP).
     /// @dev Chiunque può chiamare questa funzione. Il membro parte come Student (coefficiente 1).
     ///      Il deposito massimo è 100 ETH (= 100.000 COMP base).
-    ///      Gli ETH restano nel contratto come "buy-in" della DAO.
+    ///      Gli ETH vengono automaticamente trasferiti al Treasury della DAO.
     function joinDAO() external payable {
+        if (treasury == address(0)) revert TreasuryNotSet();
         if (isMember[msg.sender]) revert AlreadyMember();
         if (msg.value == 0) revert ZeroDeposit();
         if (msg.value > MAX_DEPOSIT) revert ExceedsMaxDeposit();
@@ -176,7 +222,49 @@ contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes {
         baseTokens[msg.sender] = tokenAmount;
 
         _mint(msg.sender, tokenAmount);
+
+        // Trasferisci gli ETH al Treasury
+        (bool success, ) = treasury.call{value: msg.value}("");
+        if (!success) revert TreasuryTransferFailed();
+
         emit MemberJoined(msg.sender, msg.value, tokenAmount);
+    }
+
+    // ======================================================================
+    //  Funzione pubblica — Mint aggiuntivo di token
+    // ======================================================================
+
+    /// @notice Minta token aggiuntivi inviando ETH. I token tengono conto del grado di competenza.
+    /// @dev Solo i membri possono chiamare questa funzione.
+    ///      Formula: tokenMintati = ETH × 1.000 × coefficienteCompetenza
+    ///      I baseTokens vengono aggiornati per i futuri calcoli di upgrade.
+    ///      Gli ETH vengono trasferiti al Treasury.
+    ///
+    ///      ESEMPIO: Un PhD (coeff 4) invia 2 ETH:
+    ///      - Nuovi baseTokens: 2.000
+    ///      - Token mintati:    2.000 × 4 = 8.000 COMP
+    function mintTokens() external payable {
+        if (!isMember[msg.sender]) revert NotMember();
+        if (msg.value == 0) revert ZeroDeposit();
+        if (treasury == address(0)) revert TreasuryNotSet();
+
+        // Calcola i token base aggiuntivi (senza moltiplicatore)
+        uint256 newBaseTokens = msg.value * TOKENS_PER_ETH;
+
+        // Applica il moltiplicatore di competenza
+        uint256 score = competenceScore[memberGrade[msg.sender]];
+        uint256 tokensToMint = newBaseTokens * score;
+
+        // Aggiorna i token base (per futuri upgrade)
+        baseTokens[msg.sender] += newBaseTokens;
+
+        _mint(msg.sender, tokensToMint);
+
+        // Trasferisci gli ETH al Treasury
+        (bool success, ) = treasury.call{value: msg.value}("");
+        if (!success) revert TreasuryTransferFailed();
+
+        emit TokensMinted(msg.sender, msg.value, tokensToMint, score);
     }
 
     // ======================================================================

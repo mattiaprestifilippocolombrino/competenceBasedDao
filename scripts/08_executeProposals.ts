@@ -1,5 +1,28 @@
 // ============================================================================
-//  08_executeProposals.ts — Esecuzione proposte approvate + riepilogo
+//  08_executeProposals.ts — Esecuzione delle proposte approvate + riepilogo
+// ============================================================================
+//
+//  COSA FA QUESTO SCRIPT:
+//  ──────────────────────
+//  1. Avanza il tempo di 1 ora (delay del Timelock)
+//  2. Esegue le proposte vincenti (A e B) messe in coda nello script 07
+//  3. Mostra il riepilogo finale: stato proposte, bilanci Treasury e Startup
+//
+//  COME FUNZIONA L'ESECUZIONE:
+//  ──────────────────────────
+//  - Dopo il queue, ogni proposta deve attendere il delay del Timelock (1 ora)
+//  - Trascorso il delay, chiunque può chiamare execute() per eseguire la proposta
+//  - L'execute chiama treasury.invest(startup, importo) che trasferisce ETH
+//  - La proposta passa dallo stato Queued (5) a Executed (7)
+//
+//  RISULTATO ATTESO:
+//  ────────────────
+//  - Proposta A: ESEGUITA — 10 ETH investiti nella startup
+//  - Proposta B: ESEGUITA — 3 ETH investiti nella startup
+//  - Proposta C: BOCCIATA — nonostante il quorum, la maggioranza era contraria
+//  - Proposta D: BOCCIATA — non ha raggiunto il quorum minimo
+//
+//  ESECUZIONE: npx hardhat run scripts/08_executeProposals.ts --network localhost
 // ============================================================================
 
 import { ethers } from "hardhat";
@@ -7,6 +30,7 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 import * as fs from "fs";
 import * as path from "path";
 
+// Mappa degli stati delle proposte
 const STATES: Record<number, string> = {
     0: "Pending", 1: "Active", 3: "Defeated", 4: "Succeeded", 5: "Queued", 7: "Executed",
 };
@@ -16,41 +40,58 @@ async function main() {
     console.log("  CompetenceDAO — Esecuzione proposte");
     console.log("══════════════════════════════════════════════════\n");
 
+    // Carica indirizzi contratti e stato proposte
     const addresses = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployedAddresses.json"), "utf8"));
     const governor = await ethers.getContractAt("MyGovernor", addresses.governor);
     const treasury = await ethers.getContractAt("Treasury", addresses.treasury);
     const mockStartup = await ethers.getContractAt("MockStartup", addresses.mockStartup);
     const pState = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "proposalState.json"), "utf8"));
 
+    // Saldo Treasury PRIMA dell'esecuzione (per calcolare quanto è stato investito)
     const balBefore = await treasury.getBalance();
     console.log(`🏦 Treasury PRIMA: ${ethers.formatEther(balBefore)} ETH\n`);
 
+    // Avanziamo il tempo di 1 ora + 1 secondo (delay del Timelock)
+    // Questo è necessario perché il Timelock impedisce l'esecuzione immediata
+    // per dare tempo alla comunità di reagire in caso di proposte malevole.
     console.log("⏳ Avanzamento delay Timelock (1 ora)...");
     await time.increase(3601);
 
+    // ── Esecuzione delle proposte vincenti ──
+    // Proviamo a eseguire le prime 2 proposte (A e B).
+    // Solo quelle con stato Queued (5) vengono eseguite.
+    // L'execute() ricostruisce la stessa chiamata invest() e la invia via Timelock.
     const LABELS = ["A", "B", "C", "D"];
     for (let i = 0; i < 2; i++) {
         const p = pState.proposals[i];
-        if (Number(await governor.state(p.id)) !== 5) continue; // 5 = Queued
+
+        // Verifica che la proposta sia in stato Queued (5)
+        if (Number(await governor.state(p.id)) !== 5) continue;
+
+        // Ricostruisci il calldata (deve essere identico a quello della proposta)
         const calldata = treasury.interface.encodeFunctionData("invest", [
             addresses.mockStartup, ethers.parseEther(p.amount),
         ]);
+
+        // Esegui la proposta: il Governor chiede al Timelock di eseguire invest()
         await governor.execute([addresses.treasury], [0n], [calldata], ethers.id(p.desc));
         console.log(`   🚀 Proposta ${LABELS[i]} ESEGUITA — ${p.amount} ETH investiti`);
     }
 
-    // ── Riepilogo ──
+    // ── RIEPILOGO FINALE ──
     console.log("\n══════════════════════════════════════════════════");
     console.log("  📋 RIEPILOGO FINALE");
     console.log("══════════════════════════════════════════════════\n");
 
+    // Stato finale di tutte le 4 proposte
     console.log("📊 Stato proposte:");
     for (let i = 0; i < 4; i++) {
         const s = Number(await governor.state(pState.proposals[i].id));
-        const icon = s === 7 ? "✅" : "❌";
+        const icon = s === 7 ? "✅" : "❌";  // ✅ se Executed, ❌ altrimenti
         console.log(`   ${icon} ${LABELS[i]} (${pState.proposals[i].amount} ETH): ${STATES[s]}`);
     }
 
+    // Bilanci finali: quanto è rimasto nel Treasury e quanto ha ricevuto la startup
     const balAfter = await treasury.getBalance();
     const startupBal = await mockStartup.getBalance();
     console.log(`\n💰 Bilanci:`);

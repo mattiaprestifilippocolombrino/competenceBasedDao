@@ -31,6 +31,14 @@ describe("Treasury + Investment Flow", function () {
         const Token = await ethers.getContractFactory("GovernanceToken");
         token = await Token.deploy(await timelock.getAddress());
         await token.waitForDeployment();
+
+        const Treasury_ = await ethers.getContractFactory("Treasury");
+        treasury = await Treasury_.deploy(await timelock.getAddress());
+        await treasury.waitForDeployment();
+
+        await token.setTreasury(await treasury.getAddress());
+
+        // Deployer entra con 10 ETH → 10.000 COMP (ETH vanno nel Treasury)
         await token.joinDAO({ value: ethers.parseEther("10") });
         await token.delegate(deployer.address);
 
@@ -40,10 +48,6 @@ describe("Treasury + Investment Flow", function () {
             VOTING_DELAY, VOTING_PERIOD, 0, 4, 20
         );
         await governor.waitForDeployment();
-
-        const Treasury_ = await ethers.getContractFactory("Treasury");
-        treasury = await Treasury_.deploy(await timelock.getAddress());
-        await treasury.waitForDeployment();
 
         const MS = await ethers.getContractFactory("MockStartup");
         mockStartup = await MS.deploy();
@@ -56,8 +60,9 @@ describe("Treasury + Investment Flow", function () {
     });
 
     it("accetta depositi ETH tramite deposit()", async function () {
+        // Il Treasury ha già 10 ETH dal joinDAO() del deployer
         await treasury.deposit({ value: ethers.parseEther("5") });
-        expect(await treasury.getBalance()).to.equal(ethers.parseEther("5"));
+        expect(await treasury.getBalance()).to.equal(ethers.parseEther("15"));
     });
 
     it("invest() reverta se non dal Timelock", async function () {
@@ -95,7 +100,8 @@ describe("Treasury + Investment Flow", function () {
         await time.increase(TIMELOCK_DELAY + 1);
         await governor.execute(targets, values, calldatas, descHash);
 
-        expect(await treasury.getBalance()).to.equal(ethers.parseEther("4"));
+        // Treasury: 10 (joinDAO) + 5 (deposit) - 1 (investimento) = 14 ETH
+        expect(await treasury.getBalance()).to.equal(ethers.parseEther("14"));
         expect(await mockStartup.totalReceived()).to.equal(ethers.parseEther("1"));
     });
 });

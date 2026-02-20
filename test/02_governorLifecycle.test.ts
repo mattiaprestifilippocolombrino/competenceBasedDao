@@ -5,11 +5,12 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { mine, time } from "@nomicfoundation/hardhat-network-helpers";
-import { GovernanceToken, MyGovernor, TimelockController } from "../typechain-types";
+import { GovernanceToken, MyGovernor, Treasury, TimelockController } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("MyGovernor — Ciclo di vita delle proposte", function () {
     let token: GovernanceToken;
+    let treasury: Treasury;
     let timelock: TimelockController;
     let governor: MyGovernor;
     let deployer: HardhatEthersSigner;
@@ -32,6 +33,12 @@ describe("MyGovernor — Ciclo di vita delle proposte", function () {
         const Token = await ethers.getContractFactory("GovernanceToken");
         token = await Token.deploy(await timelock.getAddress());
         await token.waitForDeployment();
+
+        const Treasury_ = await ethers.getContractFactory("Treasury");
+        treasury = await Treasury_.deploy(await timelock.getAddress());
+        await treasury.waitForDeployment();
+
+        await token.setTreasury(await treasury.getAddress());
 
         // Deployer entra nella DAO con 10 ETH → 10.000 COMP
         await token.joinDAO({ value: ethers.parseEther("10") });

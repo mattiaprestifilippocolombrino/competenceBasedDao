@@ -5,11 +5,12 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { mine } from "@nomicfoundation/hardhat-network-helpers";
-import { GovernanceToken, MyGovernor, TimelockController } from "../typechain-types";
+import { GovernanceToken, MyGovernor, Treasury, TimelockController } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("SuperQuorum — Approvazione rapida", function () {
     let token: GovernanceToken;
+    let treasury: Treasury;
     let timelock: TimelockController;
     let governor: MyGovernor;
     let deployer: HardhatEthersSigner;
@@ -29,6 +30,12 @@ describe("SuperQuorum — Approvazione rapida", function () {
         const Token = await ethers.getContractFactory("GovernanceToken");
         token = await Token.deploy(await timelock.getAddress());
         await token.waitForDeployment();
+
+        const Treasury_ = await ethers.getContractFactory("Treasury");
+        treasury = await Treasury_.deploy(await timelock.getAddress());
+        await treasury.waitForDeployment();
+
+        await token.setTreasury(await treasury.getAddress());
 
         const Governor = await ethers.getContractFactory("MyGovernor");
         governor = await Governor.deploy(

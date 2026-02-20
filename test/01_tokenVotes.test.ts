@@ -5,11 +5,12 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { mine } from "@nomicfoundation/hardhat-network-helpers";
-import { GovernanceToken, TimelockController } from "../typechain-types";
+import { GovernanceToken, Treasury, TimelockController } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("GovernanceToken — joinDAO + ERC20Votes", function () {
     let token: GovernanceToken;
+    let treasury: Treasury;
     let timelock: TimelockController;
     let deployer: HardhatEthersSigner;
     let alice: HardhatEthersSigner;
@@ -27,6 +28,12 @@ describe("GovernanceToken — joinDAO + ERC20Votes", function () {
         const Token = await ethers.getContractFactory("GovernanceToken");
         token = await Token.deploy(await timelock.getAddress());
         await token.waitForDeployment();
+
+        const Treasury_ = await ethers.getContractFactory("Treasury");
+        treasury = await Treasury_.deploy(await timelock.getAddress());
+        await treasury.waitForDeployment();
+
+        await token.setTreasury(await treasury.getAddress());
     });
 
     // ── joinDAO() ──
@@ -126,5 +133,36 @@ describe("GovernanceToken — joinDAO + ERC20Votes", function () {
         await expect(
             token.upgradeCompetence(alice.address, 4, "Professore")
         ).to.be.revertedWithCustomError(token, "OnlyTimelock");
+    });
+
+    // ── mintTokens() ──
+
+    it("mintTokens() minta token con moltiplicatore Student (×1)", async function () {
+        await token.connect(alice).joinDAO({ value: ethers.parseEther("1") }); // 1.000 COMP
+        await token.connect(alice).mintTokens({ value: ethers.parseEther("2") }); // 2.000 × 1 = 2.000
+
+        expect(await token.balanceOf(alice.address)).to.equal(ethers.parseUnits("3000", 18));
+        expect(await token.baseTokens(alice.address)).to.equal(ethers.parseUnits("3000", 18));
+    });
+
+    it("mintTokens() reverta se non membro", async function () {
+        await expect(
+            token.connect(alice).mintTokens({ value: ethers.parseEther("1") })
+        ).to.be.revertedWithCustomError(token, "NotMember");
+    });
+
+    it("mintTokens() reverta senza ETH", async function () {
+        await token.connect(alice).joinDAO({ value: ethers.parseEther("1") });
+        await expect(
+            token.connect(alice).mintTokens({ value: 0 })
+        ).to.be.revertedWithCustomError(token, "ZeroDeposit");
+    });
+
+    it("mintTokens() invia ETH al Treasury", async function () {
+        await token.connect(alice).joinDAO({ value: ethers.parseEther("1") });
+        const balBefore = await treasury.getBalance();
+        await token.connect(alice).mintTokens({ value: ethers.parseEther("2") });
+        const balAfter = await treasury.getBalance();
+        expect(balAfter - balBefore).to.equal(ethers.parseEther("2"));
     });
 });

@@ -1,16 +1,22 @@
 // ============================================================================
-//  02_joinMembers.ts — 14 membri entrano nella DAO con ETH
+//  02_joinMembers.ts — 14 nuovi membri entrano nella DAO
 // ============================================================================
 //
-//  Ogni membro chiama joinDAO() inviando ETH. I professori, essendo più
-//  ricchi, versano di più. Tutti partono come Student (coefficiente 1).
+//  Ogni membro chiama joinDAO() inviando ETH al contratto GovernanceToken.
+//  - Riceve COMP in proporzione: 1 ETH = 1.000 COMP
+//  - Parte come Student (coefficiente 1)
+//  - Gli ETH vengono trasferiti automaticamente nel Treasury
 //
-//  DEPOSITI:
-//  - 4 Professors:  80-100 ETH ciascuno
-//  - 3 PhDs:        20-30 ETH ciascuno
-//  - 2 Masters:     10-15 ETH ciascuno
-//  - 3 Bachelors:   5-8 ETH ciascuno
-//  - 2 Students:    1-2 ETH ciascuno
+//  NOTA: il fondatore (signers[0]) è già entrato nel deploy con 100 ETH.
+//        Qui entrano i restanti 14 membri (signers[1..14]).
+//
+//  DEPOSITI PER RUOLO:
+//  ────────────────────
+//  - 4 Professors:  60-90 ETH   → 60.000-90.000 COMP
+//  - 3 PhDs:        20-30 ETH   → 20.000-30.000 COMP
+//  - 2 Masters:     10-15 ETH   → 10.000-15.000 COMP
+//  - 3 Bachelors:   5-8 ETH     → 5.000-8.000 COMP
+//  - 2 Students:    1-2 ETH     → 1.000-2.000 COMP
 //
 //  ESECUZIONE: npx hardhat run scripts/02_joinMembers.ts --network localhost
 // ============================================================================
@@ -20,17 +26,23 @@ import * as fs from "fs";
 import * as path from "path";
 
 async function main() {
+    // Ottieni tutti gli account Hardhat (20 account di default)
     const signers = await ethers.getSigners();
 
     console.log("══════════════════════════════════════════════════");
     console.log("  CompetenceDAO — 14 membri entrano nella DAO");
     console.log("══════════════════════════════════════════════════\n");
 
+    // Carica gli indirizzi dei contratti salvati dallo script 01
     const addressesPath = path.join(__dirname, "..", "deployedAddresses.json");
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf8"));
+
+    // Riconnettiti al contratto GovernanceToken già deployato
     const token = await ethers.getContractAt("GovernanceToken", addresses.token);
 
-    // Lista dei 14 nuovi membri (signer[0] = fondatore, già entrato nel deploy)
+    // Lista dei 14 nuovi membri con ETH da depositare.
+    // signers[0] è il fondatore (già entrato nel deploy), quindi partiamo da signers[1].
+    // Ogni membro chiama joinDAO() → riceve COMP, gli ETH vanno nel Treasury.
     const members = [
         { signer: signers[1], eth: "80", label: "Professor 2" },
         { signer: signers[2], eth: "90", label: "Professor 3" },
@@ -48,12 +60,19 @@ async function main() {
         { signer: signers[14], eth: "1", label: "Student 2" },
     ];
 
+    // Per ogni membro: chiama joinDAO() inviando ETH
+    // La funzione joinDAO():
+    //   1. Verifica che il Treasury sia impostato
+    //   2. Registra il membro come Student
+    //   3. Minta token: ETH × 1.000 COMP
+    //   4. Trasferisce gli ETH al Treasury
     for (const m of members) {
         await token.connect(m.signer).joinDAO({ value: ethers.parseEther(m.eth) });
         const bal = await token.balanceOf(m.signer.address);
         console.log(`   💰 ${m.label}: ${m.eth} ETH → ${ethers.formatUnits(bal, 18)} COMP`);
     }
 
+    // Stampa la supply totale dopo tutti i join
     const supply = await token.totalSupply();
     console.log(`\n   📊 Supply totale: ${ethers.formatUnits(supply, 18)} COMP`);
     console.log("\n══════════════════════════════════════════════════");

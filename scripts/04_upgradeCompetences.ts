@@ -2,18 +2,34 @@
 //  04_upgradeCompetences.ts — Upgrade di competenza via governance (batch)
 // ============================================================================
 //
-//  Crea UNA proposta batch che upgrada tutte i 13 membri non-student
-//  in un'unica operazione. I 2 Student restano al grado base.
+//  COSA FA QUESTO SCRIPT:
+//  ──────────────────────
+//  Crea UNA proposta di governance che contiene 13 upgrade di competenza
+//  in un'unica operazione batch. I 2 Student restano al grado base.
 //
-//  Il fondatore (100.000 COMP) + Prof 2 (80.000 COMP) votano FOR.
-//  Insieme hanno 180.000 / 522.000 = 34.5% → superquorum (20%) raggiunto!
+//  COME FUNZIONA L'UPGRADE:
+//  ────────────────────────
+//  upgradeCompetence() minta token aggiuntivi secondo la formula:
+//    tokensAggiuntivi = baseTokens × (nuovoCoeff − vecchioCoeff)
 //
-//  DOPO L'UPGRADE:
-//  - Professors: base × 5     (Es: 100.000 × 5 = 500.000 COMP)
-//  - PhDs:       base × 4
-//  - Masters:    base × 3
-//  - Bachelors:  base × 2
-//  - Students:   nessun upgrade (restano base × 1)
+//  Esempio: un membro con 100.000 base token passa da Student(1) a Professor(5):
+//    tokensAggiuntivi = 100.000 × (5 − 1) = 400.000 COMP
+//    totalFinale = 100.000 + 400.000 = 500.000 COMP
+//
+//  PROCESSO DI GOVERNANCE:
+//  ──────────────────────
+//  1. Creazione proposta batch (13 chiamate in una proposta)
+//  2. Voto: Fondatore + Prof 2 votano FOR → superquorum raggiunto
+//  3. Queue nel Timelock (1 ora di delay)
+//  4. Esecuzione: tutti i 13 upgrade vengono applicati
+//
+//  RISULTATO DOPO L'UPGRADE:
+//  ────────────────────────
+//  - 5 Professors: base × 5   (Es: 100.000 × 5 = 500.000 COMP)
+//  - 3 PhDs:       base × 4   (Es: 30.000 × 4 = 120.000 COMP)
+//  - 2 Masters:    base × 3   (Es: 15.000 × 3 = 45.000 COMP)
+//  - 3 Bachelors:  base × 2   (Es: 8.000 × 2 = 16.000 COMP)
+//  - 2 Students:   nessun upgrade (restano base × 1)
 //
 //  ESECUZIONE: npx hardhat run scripts/04_upgradeCompetences.ts --network localhost
 // ============================================================================
@@ -23,6 +39,7 @@ import { mine, time } from "@nomicfoundation/hardhat-network-helpers";
 import * as fs from "fs";
 import * as path from "path";
 
+// Mappa numerica → nome del grado (per il riepilogo finale)
 const GRADE_NAMES: Record<number, string> = {
     0: "Student", 1: "Bachelor", 2: "Master", 3: "PhD", 4: "Professor",
 };
@@ -34,16 +51,20 @@ async function main() {
     console.log("  CompetenceDAO — Upgrade competenze (batch)");
     console.log("══════════════════════════════════════════════════\n");
 
+    // Carica gli indirizzi dei contratti
     const addressesPath = path.join(__dirname, "..", "deployedAddresses.json");
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf8"));
     const token = await ethers.getContractAt("GovernanceToken", addresses.token);
     const governor = await ethers.getContractAt("MyGovernor", addresses.governor);
 
-    const VOTING_DELAY = 1;
-    const VOTING_PERIOD = 50;
-    const TIMELOCK_DELAY = 3600;
+    // Parametri di governance (devono corrispondere al Governor deployato)
+    const VOTING_DELAY = 1;        // 1 blocco prima dell'inizio delle votazioni
+    const VOTING_PERIOD = 50;      // 50 blocchi per votare
+    const TIMELOCK_DELAY = 3600;   // 1 ora di attesa nel Timelock
 
-    // ── Lista upgrade: tutti tranne Student 1 e Student 2 ──
+    // ── Lista degli upgrade da applicare ──
+    // Ogni voce specifica: chi, a che grado, e la prova di competenza.
+    // I 2 Student (signers[13] e signers[14]) NON vengono inclusi.
     const upgrades = [
         { signer: signers[0], grade: 4, proof: "Professore Ordinario di AI, Politecnico di Milano" },
         { signer: signers[1], grade: 4, proof: "Professore Associato di Blockchain, UniMi" },
@@ -60,15 +81,18 @@ async function main() {
         { signer: signers[12], grade: 1, proof: "Laurea Triennale in Ingegneria, UniRm, 2024" },
     ];
 
-    // ── Costruisci proposta batch (13 chiamate in un'unica proposta) ──
+    // ── Costruzione della proposta batch ──
+    // Una proposta batch contiene più chiamate in un'unica proposta.
+    // Per ogni upgrade, costruiamo: target (token address), value (0 ETH), calldata (upgradeCompetence)
     const tokenAddr = addresses.token;
-    const targets: string[] = [];
-    const values: bigint[] = [];
-    const calldatas: string[] = [];
+    const targets: string[] = [];       // Indirizzi dei contratti da chiamare
+    const values: bigint[] = [];        // ETH da inviare (0 per upgrade)
+    const calldatas: string[] = [];     // Dati codificati delle chiamate
 
     for (const u of upgrades) {
         targets.push(tokenAddr);
         values.push(0n);
+        // Codifica la chiamata: upgradeCompetence(address, grade, proof)
         calldatas.push(
             token.interface.encodeFunctionData("upgradeCompetence", [
                 u.signer.address, u.grade, u.proof,
@@ -78,20 +102,28 @@ async function main() {
 
     const description = "Batch upgrade: 5 Professors, 3 PhDs, 2 Masters, 3 Bachelors";
 
-    // ── Proposta ──
+    // ── 1. Creazione della proposta ──
+    // Il Governor registra la proposta. Emette l'evento ProposalCreated con l'ID.
     console.log("📝 Creazione proposta batch (13 upgrade)...");
     const tx = await governor.propose(targets, values, calldatas, description);
     const receipt = await tx.wait();
+
+    // Estraiamo il proposalId dall'evento ProposalCreated nei log della transazione
     const proposalId = receipt!.logs
         .map((log: any) => { try { return governor.interface.parseLog(log); } catch { return null; } })
         .find((p: any) => p?.name === "ProposalCreated")?.args?.proposalId;
 
-    // ── Voto ──
+    // ── 2. Votazione ──
+    // Avanziamo di votingDelay + 1 blocchi per arrivare alla fase di voto
     await mine(VOTING_DELAY + 1);
-    // Fondatore (100.000) + Prof 2 (80.000) → 180.000 > 20% superquorum
-    await governor.connect(signers[0]).castVote(proposalId, 1);
+
+    // Fondatore (500.000 voti dopo l'upgrade atteso) + Prof 2 (400.000) votano FOR  
+    // → 180.000 / 522.000 = 34.5% della supply attuale → supera il superquorum (20%)
+    await governor.connect(signers[0]).castVote(proposalId, 1); // 1 = FOR
     await governor.connect(signers[1]).castVote(proposalId, 1);
 
+    // Controlla se il superquorum ha approvato immediatamente la proposta
+    // Stato 4 = Succeeded (approvata senza aspettare la fine del voting period)
     const state = Number(await governor.state(proposalId));
     if (state !== 4) {
         console.log("   ⏳ Superquorum non raggiunto, attendo fine voting period...");
@@ -99,15 +131,21 @@ async function main() {
     }
     console.log("   ✅ Proposta approvata!");
 
-    // ── Queue + Execute ──
-    const descHash = ethers.id(description);
+    // ── 3. Queue nel Timelock ──
+    // La proposta approvata viene messa in coda nel Timelock.
+    // Deve attendere TIMELOCK_DELAY (1 ora) prima dell'esecuzione.
+    const descHash = ethers.id(description);  // keccak256 della descrizione
     await governor.queue(targets, values, calldatas, descHash);
     console.log("   🔒 Proposta in coda nel Timelock");
+
+    // ── 4. Esecuzione ──
+    // Avanziamo il tempo di 1 ora, poi eseguiamo la proposta.
+    // Il Timelock chiama upgradeCompetence() 13 volte in un'unica transazione.
     await time.increase(TIMELOCK_DELAY + 1);
     await governor.execute(targets, values, calldatas, descHash);
     console.log("   🚀 Upgrade eseguiti!\n");
 
-    // ── Riepilogo ──
+    // ── Riepilogo: token e gradi dopo l'upgrade ──
     console.log("📊 Token dopo gli upgrade:");
     const labels = [
         "Professor 1", "Professor 2", "Professor 3", "Professor 4", "Professor 5",
@@ -120,6 +158,7 @@ async function main() {
         console.log(`   ${labels[i]}: ${ethers.formatUnits(bal, 18)} COMP (${GRADE_NAMES[grade]})`);
     }
 
+    // Statistiche finali: supply totale e soglie di quorum
     const supply = await token.totalSupply();
     console.log(`\n   📊 Supply totale: ${ethers.formatUnits(supply, 18)} COMP`);
     console.log(`   📊 Quorum (4%): ${ethers.formatUnits(supply * 4n / 100n, 18)} COMP`);
