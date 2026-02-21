@@ -19,8 +19,8 @@ describe("MyGovernor — Ciclo di vita delle proposte", function () {
     const VOTING_DELAY = 1;
     const VOTING_PERIOD = 50;
     const PROPOSAL_THRESHOLD = 0;
-    const QUORUM_PERCENT = 4;
-    const SUPER_QUORUM = 20;
+    const QUORUM_PERCENT = 20;
+    const SUPER_QUORUM = 70;
     const TIMELOCK_DELAY = 3600;
 
     beforeEach(async function () {

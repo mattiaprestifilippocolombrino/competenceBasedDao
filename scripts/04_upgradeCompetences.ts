@@ -118,7 +118,7 @@ async function main() {
     await mine(VOTING_DELAY + 1);
 
     // Fondatore (500.000 voti dopo l'upgrade atteso) + Prof 2 (400.000) votano FOR  
-    // → 180.000 / 522.000 = 34.5% della supply attuale → supera il superquorum (20%)
+    // → 180.000 / 522.000 = 34.5% della supply attuale → sotto il superquorum (70%), ma supera il quorum (20%)
     await governor.connect(signers[0]).castVote(proposalId, 1); // 1 = FOR
     await governor.connect(signers[1]).castVote(proposalId, 1);
 
@@ -161,8 +161,8 @@ async function main() {
     // Statistiche finali: supply totale e soglie di quorum
     const supply = await token.totalSupply();
     console.log(`\n   📊 Supply totale: ${ethers.formatUnits(supply, 18)} COMP`);
-    console.log(`   📊 Quorum (4%): ${ethers.formatUnits(supply * 4n / 100n, 18)} COMP`);
-    console.log(`   📊 Superquorum (20%): ${ethers.formatUnits(supply * 20n / 100n, 18)} COMP`);
+    console.log(`   📊 Quorum (20%): ${ethers.formatUnits(supply * 20n / 100n, 18)} COMP`);
+    console.log(`   📊 Superquorum (70%): ${ethers.formatUnits(supply * 70n / 100n, 18)} COMP`);
 
     console.log("\n══════════════════════════════════════════════════");
     console.log("  ✅ Upgrade completati! Prossimo: 05_depositTreasury.ts");

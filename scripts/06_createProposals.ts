@@ -7,12 +7,12 @@
 //  Crea 4 proposte di governance per investire ETH dal Treasury in una startup.
 //  Ogni proposta chiede di trasferire una quantità diversa di ETH.
 //
-//  LE 4 PROPOSTE:
+//  LE 4 PROPOSTE (supply ≈ 3.507.000, quorum 20% ≈ 701.400, superquorum 70% ≈ 2.454.900):
 //  ──────────────
-//  A — "Lab AI"          (10 ETH) → vincerà con SUPERQUORUM (voto immediato)
-//  B — "Ricerca"         (3 ETH)  → vincerà con ~57% a fine votazione
-//  C — "Espansione"      (8 ETH)  → perderà nonostante il quorum raggiunto
-//  D — "Fondo Minore"    (1 ETH)  → non raggiungerà nemmeno il quorum
+//  A — "Lab AI"          (10 ETH) → vincerà con SUPERQUORUM (>70% vota FOR → immediato)
+//  B — "Ricerca"         (3 ETH)  → vincerà con ~63% FOR a fine votazione
+//  C — "Espansione"      (8 ETH)  → quorum raggiunto, ma la maggioranza vota AGAINST
+//  D — "Fondo Minore"    (1 ETH)  → non raggiungerà il quorum (20%)
 //
 //  COME FUNZIONA UNA PROPOSTA:
 //  ──────────────────────────

@@ -19,8 +19,8 @@
 //  ────────────────
 //  - Proposta A: ESEGUITA — 10 ETH investiti nella startup
 //  - Proposta B: ESEGUITA — 3 ETH investiti nella startup
-//  - Proposta C: BOCCIATA — nonostante il quorum, la maggioranza era contraria
-//  - Proposta D: BOCCIATA — non ha raggiunto il quorum minimo
+//  - Proposta C: BOCCIATA — quorum raggiunto, ma la maggioranza ha votato AGAINST
+//  - Proposta D: BOCCIATA — non ha raggiunto il quorum minimo (20%)
 //
 //  ESECUZIONE: npx hardhat run scripts/08_executeProposals.ts --network localhost
 // ============================================================================

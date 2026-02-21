@@ -40,7 +40,7 @@ describe("SuperQuorum — Approvazione rapida", function () {
         const Governor = await ethers.getContractFactory("MyGovernor");
         governor = await Governor.deploy(
             await token.getAddress(), await timelock.getAddress(),
-            VOTING_DELAY, VOTING_PERIOD, 0, 4, 20
+            VOTING_DELAY, VOTING_PERIOD, 0, 20, 70
         );
         await governor.waitForDeployment();
 
@@ -61,7 +61,7 @@ describe("SuperQuorum — Approvazione rapida", function () {
     }
 
     it("superquorum → Succeeded prima della fine del period", async function () {
-        // Deployer ha 100% della supply → supera il 20% superquorum
+        // Deployer ha 100% della supply → supera il 70% superquorum
         await token.joinDAO({ value: ethers.parseEther("10") });
         await token.delegate(deployer.address);
         await mine(1);
@@ -73,17 +73,17 @@ describe("SuperQuorum — Approvazione rapida", function () {
     });
 
     it("sotto superquorum → resta Active fino alla fine del period", async function () {
-        // Deployer ha 10%, Alice ha 90% → deployer sotto il 20% superquorum
-        await token.joinDAO({ value: ethers.parseEther("1") });
-        await token.connect(alice).joinDAO({ value: ethers.parseEther("9") });
+        // Deployer ha 30%, Alice ha 70% → deployer sopra il quorum (20%) ma sotto il 70% superquorum
+        await token.joinDAO({ value: ethers.parseEther("3") });
+        await token.connect(alice).joinDAO({ value: ethers.parseEther("7") });
         await token.delegate(deployer.address);
         await token.connect(alice).delegate(alice.address);
         await mine(1);
 
         const proposalId = await createDummyProposal("Test sotto superquorum");
         await mine(VOTING_DELAY + 1);
-        await governor.castVote(proposalId, 1); // 10% FOR
-        expect(await governor.state(proposalId)).to.equal(1); // Active
+        await governor.castVote(proposalId, 1); // 30% FOR
+        expect(await governor.state(proposalId)).to.equal(1); // Active (sotto superquorum)
 
         await mine(VOTING_PERIOD + 1);
         expect(await governor.state(proposalId)).to.equal(4); // Succeeded (quorum raggiunto)

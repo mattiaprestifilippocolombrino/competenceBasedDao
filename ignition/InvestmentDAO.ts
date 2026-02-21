@@ -30,8 +30,8 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 const VOTING_DELAY = 1;            // 1 blocco di attesa prima del voto
 const VOTING_PERIOD = 50;          // 50 blocchi di finestra di voto
 const PROPOSAL_THRESHOLD = 0;     // chiunque può proporre (didattico)
-const QUORUM_PERCENT = 4;          // 4% della supply per raggiungere il quorum
-const SUPER_QUORUM_PERCENT = 20;   // 20% per il superquorum (approvazione rapida)
+const QUORUM_PERCENT = 20;         // 20% della supply per raggiungere il quorum
+const SUPER_QUORUM_PERCENT = 70;   // 70% per il superquorum (approvazione rapida)
 const TIMELOCK_MIN_DELAY = 3600;   // 1 ora di delay nel Timelock (in secondi)
 
 // ── Hash dei ruoli del TimelockController (precalcolati con keccak256) ──
@@ -72,8 +72,8 @@ const InvestmentDAOModule = buildModule("InvestmentDAOModule", (m) => {
         VOTING_DELAY,           // Ritardo prima del voto (blocchi)
         VOTING_PERIOD,          // Durata del voto (blocchi)
         PROPOSAL_THRESHOLD,     // Soglia per proporre
-        QUORUM_PERCENT,         // Quorum 4%
-        SUPER_QUORUM_PERCENT,   // Superquorum 20%
+        QUORUM_PERCENT,         // Quorum 20%
+        SUPER_QUORUM_PERCENT,   // Superquorum 70%
     ]);
 
     // ── 4. Treasury ──

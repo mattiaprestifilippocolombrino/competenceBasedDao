@@ -45,7 +45,7 @@ describe("Treasury + Investment Flow", function () {
         const Governor = await ethers.getContractFactory("MyGovernor");
         governor = await Governor.deploy(
             await token.getAddress(), await timelock.getAddress(),
-            VOTING_DELAY, VOTING_PERIOD, 0, 4, 20
+            VOTING_DELAY, VOTING_PERIOD, 0, 20, 70
         );
         await governor.waitForDeployment();
 

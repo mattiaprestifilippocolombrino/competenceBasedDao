@@ -58,7 +58,7 @@ async function main() {
     // ── 3. MyGovernor ──
     // Contratto di governance che gestisce proposte e votazioni.
     // Parametri: token, timelock, votingDelay(1), votingPeriod(50),
-    //            proposalThreshold(0), quorumPercent(4%), superQuorum(20%)
+    //            proposalThreshold(0), quorumPercent(20%), superQuorum(70%)
     const Governor = await ethers.getContractFactory("MyGovernor");
     const governor = await Governor.deploy(
         await token.getAddress(),       // Token per il voting power
@@ -66,8 +66,8 @@ async function main() {
         1,                              // votingDelay: 1 blocco prima di votare
         50,                             // votingPeriod: 50 blocchi per votare
         0,                              // proposalThreshold: 0 COMP per proporre
-        4,                              // quorumPercent: 4% della supply
-        20                              // superQuorum: 20% → approvazione immediata
+        20,                             // quorumPercent: 20% della supply
+        70                              // superQuorum: 70% → approvazione immediata
     );
     await governor.waitForDeployment();
     console.log(`3️⃣  MyGovernor:         ${await governor.getAddress()}`);
