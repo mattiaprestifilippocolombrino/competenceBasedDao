@@ -1,6 +1,7 @@
 Progetto 1: EduInvestment DAO – Mattia Prestifilippo
 Questo progetto implementa una DAO in cui il potere di voto non è determinato solo dalla quantità di ETH versati da un utente, ma è influenzato dal grado di competenza del membro. I membri con grado di competenza più elevato ricevono un coefficiente che va a moltiplicare i propri token, amplificando il loro potere di voto.
 Questo vuole essere solo un primo esempio per vedere il funzionamento delle DAO e per dare il potere di voto in base alle competenze.
+Link github: https://github.com/mattiaprestifilippocolombrino/competenceBasedDao
 
 Decisioni principali
 Chiunque può entrare nella DAO inviando ETH e ricevendo token. In una prima idea per partecipare alla DAO doveva essere effettuata una proposta ed approvata dai membri della DAO, ma per rendere il processo aperto a più utenti ho scelto che in questa versione chiunque possa unirsi alla DAO e mintare token.
