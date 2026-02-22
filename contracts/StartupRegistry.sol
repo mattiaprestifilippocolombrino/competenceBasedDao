@@ -1,93 +1,71 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-// ============================================================================
-//  StartupRegistry.sol — Registro delle startup approvate
-// ============================================================================
-//
-//  COSA FA QUESTO CONTRATTO:
-//  -------------------------
-//  Mantiene un registro di startup/progetti verso cui la DAO può investire.
-//  Invece di proporre investimenti verso indirizzi "random", la DAO può
-//  verificare che la startup sia registrata e attiva.
-//
-//  PERCHÉ SERVE:
-//  -------------
-//  In una DAO reale, non si investe verso un indirizzo qualsiasi.
-//  Il registro serve per:
-//  - dare un'identità leggibile alle startup (nome, descrizione)
-//  - controllare che la startup sia ancora attiva
-//  - rendere le proposte di investimento più trasparenti
-//
-//  NOTA DIDATTICA:
-//  ---------------
-//  Questo contratto NON è necessario per il funzionamento del Governor,
-//  ma rende il progetto più realistico e completo. In una versione
-//  avanzata, la registrazione potrebbe essere fatta tramite governance
-//  anziché dal deployer.
-// ============================================================================
+/*
+Contratto che mantiene un registro on-chain di startup/progetti verso cui la DAO può investire.
+Invece di proporre investimenti verso indirizzi "random", la DAO può
+verificare che la startup sia registrata e attiva.
+Contratto non necessario per il funzionamento del Governor, ma rende il progetto realistico tenendo conto delle startup verso cui la DAO può investire.
+TODO: Devo aggiornarlo, dando la possibilità di registrare startup solo tramite il Governor, e quindi il TimelockController.
+*/
 
-/// @title StartupRegistry
-/// @notice Registro on-chain delle startup in cui la DAO può investire
 contract StartupRegistry {
-    // ── Struttura dati per una startup ──
-
-    /// @notice Dati di una startup registrata
+    // Struttura dati per una startup
     struct Startup {
-        string name; // Nome della startup (es. "GreenTech AI")
+        string name; // Nome della startup
         address wallet; // Indirizzo wallet che riceverà gli investimenti
         string description; // Breve descrizione del progetto
         bool active; // true = la startup può ricevere investimenti
     }
 
-    // ── Variabili di stato ──
+    // Variabili di stato
 
-    /// @notice Chi ha deployato il contratto (può registrare startup)
+    /// Indirizzo di chi ha deployato il contratto (può registrare startup)
     address public owner;
 
-    /// @notice Contatore delle startup registrate (usato come ID)
+    /// Contatore delle startup registrate (usato come ID)
     uint256 public startupCount;
 
-    /// @notice Mapping ID → dati della startup
+    /// Mapping ID → dati della startup
     mapping(uint256 => Startup) public startups;
 
-    // ── Eventi ──
+    // Eventi
 
-    /// @notice Emesso quando una nuova startup viene registrata
+    /// Emesso quando una nuova startup viene registrata
     event StartupRegistered(uint256 indexed id, string name, address wallet);
 
-    /// @notice Emesso quando una startup viene disattivata
+    /// Emesso quando una startup viene disattivata
     event StartupDeactivated(uint256 indexed id);
 
-    // ── Errori ──
+    // Errori
 
-    /// @notice Solo il proprietario può eseguire questa azione
+    /// Solo il proprietario può eseguire questa azione
     error OnlyOwner();
 
-    /// @notice L'ID della startup non esiste
+    /// L'ID della startup non esiste
     error StartupNotFound();
 
-    /// @notice L'indirizzo fornito è zero
+    /// L'indirizzo fornito è zero
     error ZeroAddress();
 
-    // ── Modifier ──
+    // Modifier
 
-    /// @notice Permette l'accesso solo al proprietario
+    /// Permette l'accesso solo al proprietario
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwner();
         _;
     }
 
-    // ── Constructor ──
+    // Constructor
 
-    /// @notice Imposta il deployer come proprietario del registro
+    /// Imposta il deployer come proprietario del registro
     constructor() {
         owner = msg.sender;
     }
 
-    // ── Funzioni pubbliche ──
+    // Funzioni pubbliche
 
-    /// @notice Registra una nuova startup nel registro
+    /// Registra una nuova startup nel registro
     /// @param _name        Nome della startup
     /// @param _wallet      Indirizzo wallet della startup
     /// @param _description Breve descrizione del progetto

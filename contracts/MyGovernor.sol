@@ -1,50 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-// ============================================================================
-//  MyGovernor.sol — Il cervello della DAO
-// ============================================================================
-//
-//  COSA FA QUESTO CONTRATTO:
-//  -------------------------
-//  Gestisce l'intero ciclo di vita delle proposte di investimento:
-//    propose → vote → queue → (delay) → execute
-//
-//  È composto da 7 moduli OpenZeppelin che lavorano insieme:
-//
-//  1. Governor (core)         → motore base: propose, state, castVote
-//  2. GovernorSettings        → parametri: votingDelay, votingPeriod, threshold
-//  3. GovernorCountingSimple  → conteggio: For / Against / Abstain
-//  4. GovernorVotes           → collega il token ERC20Votes per il peso di voto
-//  5. GovernorVotesQuorumFraction   → quorum in % della supply totale
-//  6. GovernorVotesSuperQuorumFraction → superquorum (approvazione rapida)
-//  7. GovernorTimelockControl → delay di sicurezza prima dell'esecuzione
-//
-//  CATENA DI EREDITARIETÀ (linearizzazione C3):
-//  ─────────────────────────────────────────────
-//  MyGovernor
-//    → GovernorTimelockControl     (esecuzione ritardata via timelock)
-//    → GovernorVotesSuperQuorumFraction (superquorum % della supply)
-//      → GovernorVotesQuorumFraction    (quorum % della supply)
-//      → GovernorSuperQuorum            (logica superquorum base)
-//    → GovernorVotes               (peso di voto dal token ERC20Votes)
-//    → GovernorCountingSimple      (conteggio: for/against/abstain)
-//    → GovernorSettings            (votingDelay, votingPeriod, threshold)
-//    → Governor                    (nucleo del sistema)
-//
-//  FLUSSO DI UNA PROPOSTA:
-//  -----------------------
-//  1. propose()   → crea la proposta, stato = Pending
-//  2. (voting delay passa) → stato = Active
-//  3. castVote()  → i membri votano For/Against/Abstain
-//  4. (voting period finisce) → stato = Succeeded o Defeated
-//     OPPURE: se superquorum raggiunto → Succeeded prima della scadenza!
-//  5. queue()     → mette la proposta nel Timelock (stato = Queued)
-//  6. (timelock delay passa)
-//  7. execute()   → il Timelock esegue l'operazione (stato = Executed)
-// ============================================================================
+/*
+    Contratto che gestisce la governance della DAO, ovvero l'intero ciclo di vita
+    delle proposte di investimento: propose → vote → queue → (delay) → execute
+    Eredita 7 moduli OpenZeppelin che lavorano insieme:
+    Governor (core): Fornisce la struttura di base per gestire le proposte
+    GovernorSettings: Fornisce i parametri di voto: votingDelay, votingPeriod, threshold
+    GovernorCountingSimple: Fornisce le funzioni di conteggio: For / Against / Abstain
+    GovernorVotes: Collega il token ERC20Votes al Governor
+    GovernorVotesQuorumFraction: Gestisce i parametri di quorum: Quorum in % della supply totale
+    GovernorVotesSuperQuorumFraction: Gestisce i parametri di superquorum per l'approvazione rapida
+    GovernorTimelockControl: Gestisce il timelock, che fornisce un delay di sicurezza prima dell'esecuzione. 
+    Il flusso di esecuzione di una proposta è il seguente: 
+    1. propose()   → crea la proposta, stato = Pending
+    2. (voting delay passa) → stato = Active
+    3. castVote()  → i membri votano For/Against/Abstain
+    4. (voting period finisce) → stato = Succeeded o Defeated
+       OPPURE: se superquorum raggiunto → Succeeded prima della scadenza!
+    5. queue()     → mette la proposta nel Timelock (stato = Queued)
+    6. (timelock delay passa)
+    7. execute()   → il Timelock esegue l'operazione (stato = Executed)
+*/
 
-// --- Import dei moduli OpenZeppelin Governance v5 ---
 import "@openzeppelin/contracts/governance/Governor.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
@@ -56,8 +34,6 @@ import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.so
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "@openzeppelin/contracts/governance/utils/IVotes.sol";
 
-/// @title MyGovernor
-/// @notice Logica della DAO: gestisce proposte, votazioni, quorum/superquorum e timelock
 contract MyGovernor is
     Governor,
     GovernorSettings,
@@ -67,10 +43,11 @@ contract MyGovernor is
     GovernorVotesSuperQuorumFraction,
     GovernorTimelockControl
 {
-    // ======================================================================
-    //  Constructor — Configura tutti i parametri della governance
-    // ======================================================================
-
+    /*  Il costruttore riceve in input il Token ERC20Votes, il TimelockController, il numero di blocchi di attesa
+    prima dell'inizio del voto, la durata della finestra di voto, la soglia minima di voti per poter 
+    creare una proposta, il quorum in % della supply totale votabile al blocco di snapshot della proposta, 
+    e il superquorum. I contratti ereditati vengono inizializzati con tali parametri.
+*/
     /// @param token_                Token ERC20Votes (chi lo possiede può votare)
     /// @param timelock_             TimelockController (delay di sicurezza)
     /// @param votingDelay_          Blocchi/secondi di attesa prima dell'inizio del voto
@@ -95,16 +72,9 @@ contract MyGovernor is
         GovernorTimelockControl(timelock_)
     {}
 
-    // ======================================================================
-    //  Override richiesti da Solidity per risolvere conflitti di ereditarietà
-    // ======================================================================
-    //
-    //  PERCHÉ SERVONO QUESTI OVERRIDE?
-    //  ───────────────────────────────
-    //  Quando un contratto eredita da più contratti che definiscono la STESSA
-    //  funzione, Solidity richiede un override esplicito per chiarire quale
-    //  implementazione usare. In tutti i casi usiamo `super.xxx()` che segue
-    //  la linearizzazione C3 (chiama la versione "più in alto" nella catena).
+    // Override richiesti da Solidity per risolvere conflitti di ereditarietà.abi
+    // Il contratto esegue l'override delle funzioni votingDelay, votingPeriod, proposalThreshold, quorum, clock,
+    // e _execute.
 
     // ----- Parametri di governance (GovernorSettings ↔ Governor) -----
 

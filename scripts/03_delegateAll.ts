@@ -1,24 +1,19 @@
-// ============================================================================
-//  03_delegateAll.ts — Auto-delega dei voti per tutti i 15 membri
-// ============================================================================
-//
-//  PERCHÉ È NECESSARIO:
-//  ────────────────────
-//  In OpenZeppelin ERC20Votes, possedere token NON dà automaticamente
-//  diritto di voto. Bisogna "delegare" i propri voti a qualcuno.
-//
-//  Se deleghi a TE STESSO → il tuo voting power = il tuo saldo token.
-//  Se deleghi a UN ALTRO  → lui vota con il peso dei tuoi token.
-//
-//  Senza delega, getVotes() restituisce 0 anche se hai milioni di token.
-//
-//  COSA FA QUESTO SCRIPT:
-//  ──────────────────────
-//  Ogni membro delega i voti a sé stesso → attiva il proprio voting power.
-//  Poi mina 1 blocco per consolidare i checkpoint on-chain.
-//
-//  ESECUZIONE: npx hardhat run scripts/03_delegateAll.ts --network localhost
-// ============================================================================
+/*
+03_delegateAll.ts — Auto-delega dei voti per tutti i 15 membri
+
+In OpenZeppelin ERC20Votes, possedere token NON dà automaticamente
+diritto di voto. Bisogna "delegare" i propri voti a qualcuno.
+
+Se deleghi a TE STESSO, il tuo voting power è il tuo saldo token.
+Se deleghi a UN ALTRO, lui vota con il peso dei tuoi token.
+ Senza delega, getVotes() restituisce 0 anche se hai milioni di token.
+
+COSA FA QUESTO SCRIPT:
+Ogni membro delega i voti a sé stesso → attiva il proprio voting power.
+Poi mina 1 blocco per consolidare i checkpoint on-chain.
+
+ESECUZIONE: npx hardhat run scripts/03_delegateAll.ts --network localhost
+*/
 
 import { ethers } from "hardhat";
 import { mine } from "@nomicfoundation/hardhat-network-helpers";

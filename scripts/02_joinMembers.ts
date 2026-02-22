@@ -1,25 +1,20 @@
-// ============================================================================
-//  02_joinMembers.ts — 14 nuovi membri entrano nella DAO
-// ============================================================================
-//
-//  Ogni membro chiama joinDAO() inviando ETH al contratto GovernanceToken.
-//  - Riceve COMP in proporzione: 1 ETH = 1.000 COMP
-//  - Parte come Student (coefficiente 1)
-//  - Gli ETH vengono trasferiti automaticamente nel Treasury
-//
-//  NOTA: il fondatore (signers[0]) è già entrato nel deploy con 100 ETH.
-//        Qui entrano i restanti 14 membri (signers[1..14]).
-//
-//  DEPOSITI PER RUOLO:
-//  ────────────────────
-//  - 4 Professors:  60-90 ETH   → 60.000-90.000 COMP
-//  - 3 PhDs:        20-30 ETH   → 20.000-30.000 COMP
-//  - 2 Masters:     10-15 ETH   → 10.000-15.000 COMP
-//  - 3 Bachelors:   5-8 ETH     → 5.000-8.000 COMP
-//  - 2 Students:    1-2 ETH     → 1.000-2.000 COMP
-//
-//  ESECUZIONE: npx hardhat run scripts/02_joinMembers.ts --network localhost
-// ============================================================================
+/*
+02_joinMembers.ts — 14 nuovi membri entrano nella DAO
+ESECUZIONE: npx hardhat run scripts/02_joinMembers.ts --network localhost
+
+Ogni membro chiama joinDAO() inviando ETH al contratto GovernanceToken e ricevendo token in proporzione.
+Dopo il mint ogni membro parte come Student (coefficiente 1). Gli ETH vengono trasferiti automaticamente nel Treasury.
+Il fondatore (signers[0]) è già entrato nel deploy con 100 ETH. Qui entrano i restanti 14 membri (signers[1..14]).
+
+DEPOSITI PER RUOLO:
+- 4 Professors:  60-90 ETH   → 60.000-90.000 COMP
+- 3 PhDs:        20-30 ETH   → 20.000-30.000 COMP
+- 2 Masters:     10-15 ETH   → 10.000-15.000 COMP
+- 3 Bachelors:   5-8 ETH     → 5.000-8.000 COMP
+- 2 Students:    1-2 ETH     → 1.000-2.000 COMP
+
+ESECUZIONE: npx hardhat run scripts/02_joinMembers.ts --network localhost
+*/
 
 import { ethers } from "hardhat";
 import * as fs from "fs";
@@ -60,12 +55,7 @@ async function main() {
         { signer: signers[14], eth: "1", label: "Student 2" },
     ];
 
-    // Per ogni membro: chiama joinDAO() inviando ETH
-    // La funzione joinDAO():
-    //   1. Verifica che il Treasury sia impostato
-    //   2. Registra il membro come Student
-    //   3. Minta token: ETH × 1.000 COMP
-    //   4. Trasferisce gli ETH al Treasury
+    // Per ogni membro: chiama joinDAO() inviando ETH e controlla il balance di token ottenuti.
     for (const m of members) {
         await token.connect(m.signer).joinDAO({ value: ethers.parseEther(m.eth) });
         const bal = await token.balanceOf(m.signer.address);
