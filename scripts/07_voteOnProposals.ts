@@ -1,36 +1,32 @@
-// ============================================================================
-//  07_voteOnProposals.ts — Votazione e Queue delle proposte
-// ============================================================================
-//
-//  COSA FA QUESTO SCRIPT:
-//  ──────────────────────
-//  1. Avanza il votingDelay (1 blocco) per entrare nella fase di voto
-//  2. I membri votano sulle 4 proposte create nello script 06
-//  3. Avanza il votingPeriod (50 blocchi) per chiudere le votazioni
-//  4. Mette in coda (queue) le proposte vincenti nel Timelock
-//
-//  SUPPLY TOTALE: ~3.507.000 COMP (dopo upgrade + mint)
-//  QUORUM (20%):       ~701.400 COMP — minimo di voti FOR per validità
-//  SUPERQUORUM (70%): ~2.454.900 COMP — soglia per approvazione immediata
-//
-//  SCENARIO DI VOTO:
-//  ────────────────
-//  A — SUPERQUORUM (70%): Prof1 (750k) + Prof2 (600k) + Prof3 (675k) + Prof4 (525k)
-//                          = 2.550.000 FOR (72.7%) → supera il 70% → Succeeded subito!
-//  B — ~63% WIN:    Prof1 (750k) + PhD1 (160k) votano FOR (910.000)
-//                   Prof5 (450k) + PhD3 (80k) votano AGAINST (530.000)
-//                   → 63% FOR, quorum raggiunto → approvata a fine period
-//  C — QUORUM MA PERDE: Prof5 (450k) + PhD1 (160k) + PhD2 (132k) votano FOR (742.000)
-//                        Prof1 (750k) + Prof2 (600k) votano AGAINST (1.350.000)
-//                        → 35% FOR → bocciata
-//  D — SOTTO QUORUM: Bachelor2 (10k) + Bachelor3 (12k) + Student1 (2k) + Student2 (1k)
-//                     = 25.000 FOR → molto sotto il 20% → bocciata
-//
-//  VALORI DI VOTO: 0 = AGAINST (contrario), 1 = FOR (favorevole)
-//
-//  ESECUZIONE: npx hardhat run scripts/07_voteOnProposals.ts --network localhost
-// ============================================================================
+/* 
+07_voteOnProposals.ts — Votazione e Queue delle proposte
 
+Script che avanza il votingDelay (1 blocco) per entrare nella fase di voto, 
+i membri votano sulle 4 proposte create nello script precedente, 
+avanza il votingPeriod (50 blocchi) per chiudere le votazioni e 
+mette in coda le proposte vincenti nel Timelock.
+
+SUPPLY TOTALE: ~3.507.000 COMP (dopo upgrade + mint)
+QUORUM (20%):       ~701.400 COMP — minimo di voti FOR per validità
+SUPERQUORUM (70%): ~2.454.900 COMP — soglia per approvazione immediata
+
+SCENARIO DI VOTO:
+────────────────
+A — SUPERQUORUM (70%): Prof1 (750k) + Prof2 (600k) + Prof3 (675k) + Prof4 (525k)
+                          = 2.550.000 FOR (72.7%) → supera il 70% → Succeeded subito!
+B — ~63% WIN:    Prof1 (750k) + PhD1 (160k) votano FOR (910.000)
+                   Prof5 (450k) + PhD3 (80k) votano AGAINST (530.000)
+                   → 63% FOR, quorum raggiunto → approvata a fine period
+C — QUORUM MA PERDE: Prof5 (450k) + PhD1 (160k) + PhD2 (132k) votano FOR (742.000)
+                   Prof1 (750k) + Prof2 (600k) votano AGAINST (1.350.000)
+                   → 35% FOR → bocciata
+D — SOTTO QUORUM: Bachelor2 (10k) + Bachelor3 (12k) + Student1 (2k) + Student2 (1k)
+                   = 25.000 FOR → molto sotto il 20% → bocciata
+
+VALORI DI VOTO: 0 = AGAINST (contrario), 1 = FOR (favorevole)
+
+ESECUZIONE: npx hardhat run scripts/07_voteOnProposals.ts --network localhost
+*/
 import { ethers } from "hardhat";
 import { mine } from "@nomicfoundation/hardhat-network-helpers";
 import * as fs from "fs";

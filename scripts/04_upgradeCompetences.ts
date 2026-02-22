@@ -1,45 +1,37 @@
-// ============================================================================
-//  04_upgradeCompetences.ts — Upgrade di competenza via governance (batch)
-// ============================================================================
-//
-//  COSA FA QUESTO SCRIPT:
-//  ──────────────────────
-//  Crea UNA proposta di governance che contiene 13 upgrade di competenza
-//  in un'unica operazione batch. I 2 Student restano al grado base.
-//
-//  COME FUNZIONA L'UPGRADE:
-//  ────────────────────────
-//  upgradeCompetence() minta token aggiuntivi secondo la formula:
-//    tokensAggiuntivi = baseTokens × (nuovoCoeff − vecchioCoeff)
-//
-//  Esempio: un membro con 100.000 base token passa da Student(1) a Professor(5):
-//    tokensAggiuntivi = 100.000 × (5 − 1) = 400.000 COMP
-//    totalFinale = 100.000 + 400.000 = 500.000 COMP
-//
-//  PROCESSO DI GOVERNANCE:
-//  ──────────────────────
-//  1. Creazione proposta batch (13 chiamate in una proposta)
-//  2. Voto: Fondatore + Prof 2 votano FOR → superquorum raggiunto
-//  3. Queue nel Timelock (1 ora di delay)
-//  4. Esecuzione: tutti i 13 upgrade vengono applicati
-//
-//  RISULTATO DOPO L'UPGRADE:
-//  ────────────────────────
-//  - 5 Professors: base × 5   (Es: 100.000 × 5 = 500.000 COMP)
-//  - 3 PhDs:       base × 4   (Es: 30.000 × 4 = 120.000 COMP)
-//  - 2 Masters:    base × 3   (Es: 15.000 × 3 = 45.000 COMP)
-//  - 3 Bachelors:  base × 2   (Es: 8.000 × 2 = 16.000 COMP)
-//  - 2 Students:   nessun upgrade (restano base × 1)
-//
-//  ESECUZIONE: npx hardhat run scripts/04_upgradeCompetences.ts --network localhost
-// ============================================================================
+/*
+04_upgradeCompetences.ts — Upgrade di competenza via governance (batch)
+Script che esegue l'upgrade delle competenze dei membri tramite governance.
+Crea UNA proposta di governance che contiene 13 upgrade di competenza
+in un'unica operazione batch. I 2 Student restano al grado base.
+Gli utenti che hanno eseguito l'upgrade ricevono i token aggiuntivi.
+Viene creata la proposta di upgrade, specificando per ogni membro indirizzo, grado e prova di competenza.
+Si avanza di votingDelay + 1 blocchi per arrivare alla fase di voto.
+Viene sottoposta a voto e approvata. Vengono avanzati i blocchi fino alla fine del periodo di voto.
+Viene inclusa nella coda del Timelock, viene avanzato il tempo fino alla fine del periodo di attesa e poi viene eseguita.
+Viene stampata la total supply, il quorum e il superquorum aggiornati.
+PROCESSO DI GOVERNANCE:
+1. Creazione proposta batch (13 chiamate in una proposta)
+2. Voto: Fondatore + Prof 2 votano FOR → superquorum raggiunto
+3. Queue nel Timelock (1 ora di delay)
+4. Esecuzione: tutti i 13 upgrade vengono applicati
+
+RISULTATO DOPO L'UPGRADE:
+- 5 Professors: base × 5   (Es: 100.000 × 5 = 500.000 COMP)
+- 3 PhDs:       base × 4   (Es: 30.000 × 4 = 120.000 COMP)
+- 2 Masters:    base × 3   (Es: 15.000 × 3 = 45.000 COMP)
+- 3 Bachelors:  base × 2   (Es: 8.000 × 2 = 16.000 COMP)
+- 2 Students:   nessun upgrade (restano base × 1)
+
+ESECUZIONE: npx hardhat run scripts/04_upgradeCompetences.ts --network localhost
+*/
+
 
 import { ethers } from "hardhat";
 import { mine, time } from "@nomicfoundation/hardhat-network-helpers";
 import * as fs from "fs";
 import * as path from "path";
 
-// Mappa numerica → nome del grado (per il riepilogo finale)
+// Mappa numerica → nome del grado
 const GRADE_NAMES: Record<number, string> = {
     0: "Student", 1: "Bachelor", 2: "Master", 3: "PhD", 4: "Professor",
 };
@@ -62,7 +54,7 @@ async function main() {
     const VOTING_PERIOD = 50;      // 50 blocchi per votare
     const TIMELOCK_DELAY = 3600;   // 1 ora di attesa nel Timelock
 
-    // ── Lista degli upgrade da applicare ──
+    // Lista degli upgrade da applicare
     // Ogni voce specifica: chi, a che grado, e la prova di competenza.
     // I 2 Student (signers[13] e signers[14]) NON vengono inclusi.
     const upgrades = [
@@ -81,7 +73,7 @@ async function main() {
         { signer: signers[12], grade: 1, proof: "Laurea Triennale in Ingegneria, UniRm, 2024" },
     ];
 
-    // ── Costruzione della proposta batch ──
+    // Costruzione della proposta batch
     // Una proposta batch contiene più chiamate in un'unica proposta.
     // Per ogni upgrade, costruiamo: target (token address), value (0 ETH), calldata (upgradeCompetence)
     const tokenAddr = addresses.token;
@@ -102,7 +94,7 @@ async function main() {
 
     const description = "Batch upgrade: 5 Professors, 3 PhDs, 2 Masters, 3 Bachelors";
 
-    // ── 1. Creazione della proposta ──
+    // Creazione della proposta 
     // Il Governor registra la proposta. Emette l'evento ProposalCreated con l'ID.
     console.log("📝 Creazione proposta batch (13 upgrade)...");
     const tx = await governor.propose(targets, values, calldatas, description);
@@ -113,7 +105,7 @@ async function main() {
         .map((log: any) => { try { return governor.interface.parseLog(log); } catch { return null; } })
         .find((p: any) => p?.name === "ProposalCreated")?.args?.proposalId;
 
-    // ── 2. Votazione ──
+    // Votazione
     // Avanziamo di votingDelay + 1 blocchi per arrivare alla fase di voto
     await mine(VOTING_DELAY + 1);
 

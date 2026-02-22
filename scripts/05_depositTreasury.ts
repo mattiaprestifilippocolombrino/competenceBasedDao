@@ -1,29 +1,13 @@
+/*
+05_depositTreasury.ts — Mint aggiuntivo di token (ETH → Treasury)
+Script in cui i membri della DAOmintano nuovi token inviando ETH tramite mintTokens().
+I token ricevuti tengono conto del grado di competenza attuale.
+Gli ETH vengono automaticamente trasferiti al Treasury della DAO.
+I baseTokens del membro vengono aggiornati per futuri calcoli di upgrade.
+
+ESECUZIONE: npx hardhat run scripts/05_depositTreasury.ts --network localhost
 // ============================================================================
-//  05_depositTreasury.ts — Mint aggiuntivo di token (ETH → Treasury)
-// ============================================================================
-//
-//  COSA FA QUESTO SCRIPT:
-//  ──────────────────────
-//  I membri mintano nuovi token inviando ETH tramite mintTokens().
-//  A differenza di joinDAO() (usata per entrare), mintTokens() permette
-//  ai membri GIÀ REGISTRATI di acquistare token aggiuntivi.
-//
-//  COME FUNZIONA:
-//  ──────────────
-//  I token ricevuti tengono conto del grado di competenza attuale:
-//    TokenMintati = ETH × 1.000 × CoefficienteCompetenza
-//
-//  ESEMPI (con 1 ETH):
-//  - Student (×1):   → 1.000 COMP
-//  - Bachelor (×2):  → 2.000 COMP
-//  - PhD (×4):       → 4.000 COMP
-//  - Professor (×5): → 5.000 COMP
-//
-//  Gli ETH vengono automaticamente trasferiti al Treasury della DAO.
-//  I baseTokens del membro vengono aggiornati per futuri calcoli di upgrade.
-//
-//  ESECUZIONE: npx hardhat run scripts/05_depositTreasury.ts --network localhost
-// ============================================================================
+*/
 
 import { ethers } from "hardhat";
 import * as fs from "fs";

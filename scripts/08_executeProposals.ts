@@ -1,20 +1,14 @@
-// ============================================================================
-//  08_executeProposals.ts — Esecuzione delle proposte approvate + riepilogo
-// ============================================================================
-//
-//  COSA FA QUESTO SCRIPT:
-//  ──────────────────────
-//  1. Avanza il tempo di 1 ora (delay del Timelock)
-//  2. Esegue le proposte vincenti (A e B) messe in coda nello script 07
-//  3. Mostra il riepilogo finale: stato proposte, bilanci Treasury e Startup
-//
-//  COME FUNZIONA L'ESECUZIONE:
-//  ──────────────────────────
-//  - Dopo il queue, ogni proposta deve attendere il delay del Timelock (1 ora)
-//  - Trascorso il delay, chiunque può chiamare execute() per eseguire la proposta
-//  - L'execute chiama treasury.invest(startup, importo) che trasferisce ETH
-//  - La proposta passa dallo stato Queued (5) a Executed (7)
-//
+/*
+ 08_executeProposals.ts — Esecuzione delle proposte approvate + riepilogo
+
+Script che avanza il tempo di 1 ora (delay del Timelock), esegue le proposte vincenti (A e B) 
+messe in coda nello script precedente e mostra un riepilogo finale: stato proposte, bilanci Treasury e Startup.
+Viene avanzato il tempo di 1 ora per far passare il delay del Timelock.
+Trascorso il delay, chiunque può chiamare execute() per eseguire la proposta. 
+Viene ricostruito il calldata (deve essere identico a quello della proposta) e inviato al Timelock.
+L'execute() chiama la funzione della proposta, treasury.invest(startup, importo) che trasferisce ETH alla startup.
+
+
 //  RISULTATO ATTESO:
 //  ────────────────
 //  - Proposta A: ESEGUITA — 10 ETH investiti nella startup
@@ -24,7 +18,7 @@
 //
 //  ESECUZIONE: npx hardhat run scripts/08_executeProposals.ts --network localhost
 // ============================================================================
-
+*/
 import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import * as fs from "fs";

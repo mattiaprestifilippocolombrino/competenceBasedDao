@@ -1,31 +1,26 @@
+/*
+06_createProposals.ts — Crea 4 proposte di investimento in startup
+
+Script che crea 4 proposte di governance per investire ETH dal Treasury della DAO in una startup.
+
+Ogni proposta chiede di trasferire una quantità diversa di ETH.
+Si hanno 4 PROPOSTE, con supply ≈ 3.507.000, quorum 20% ≈ 701.400, superquorum 70% ≈ 2.454.900.
+  A — "Lab AI"          (10 ETH) → vincerà con SUPERQUORUM (>70% vota FOR → immediato)
+  B — "Ricerca"         (3 ETH)  → vincerà con ~63% FOR a fine votazione
+  C — "Espansione"      (8 ETH)  → quorum raggiunto, ma la maggioranza vota AGAINST
+  D — "Fondo Minore"    (1 ETH)  → non raggiungerà il quorum (20%)
+
+Per ogni proposta viene codificata la chiamata invest(startup, importo) come calldata 
+e inviata al Governor con propose().
+Il Governor riceve in input l'indirizzo del contratto da chiamare, il Treasury, come targets,
+gli ETH da inviare con la chiamata, 0, perché invest() non è payable, come values,
+la chiamata codificata (invest(startup, importo)) come calldatas e la descrizione della proposta.
+Gli ID delle proposte vengono salvati in proposalState.json per gli script successivi.
+
+ESECUZIONE: npx hardhat run scripts/06_createProposals.ts --network localhost
 // ============================================================================
-//  06_createProposals.ts — Crea 4 proposte di investimento in startup
-// ============================================================================
-//
-//  COSA FA QUESTO SCRIPT:
-//  ──────────────────────
-//  Crea 4 proposte di governance per investire ETH dal Treasury in una startup.
-//  Ogni proposta chiede di trasferire una quantità diversa di ETH.
-//
-//  LE 4 PROPOSTE (supply ≈ 3.507.000, quorum 20% ≈ 701.400, superquorum 70% ≈ 2.454.900):
-//  ──────────────
-//  A — "Lab AI"          (10 ETH) → vincerà con SUPERQUORUM (>70% vota FOR → immediato)
-//  B — "Ricerca"         (3 ETH)  → vincerà con ~63% FOR a fine votazione
-//  C — "Espansione"      (8 ETH)  → quorum raggiunto, ma la maggioranza vota AGAINST
-//  D — "Fondo Minore"    (1 ETH)  → non raggiungerà il quorum (20%)
-//
-//  COME FUNZIONA UNA PROPOSTA:
-//  ──────────────────────────
-//  Il Governor riceve:
-//  - targets:   l'indirizzo del contratto da chiamare (Treasury)
-//  - values:    ETH da inviare con la chiamata (0, perché invest() non è payable)
-//  - calldatas: la chiamata codificata (invest(startup, importo))
-//  - description: testo leggibile della proposta
-//
-//  Gli ID delle proposte vengono salvati in proposalState.json per gli script successivi.
-//
-//  ESECUZIONE: npx hardhat run scripts/06_createProposals.ts --network localhost
-// ============================================================================
+*/
+
 
 import { ethers } from "hardhat";
 import * as fs from "fs";
